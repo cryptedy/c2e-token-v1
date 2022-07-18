@@ -5,15 +5,16 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PTR is IPTR, ERC20, Ownable {
-    int64 _eqA;
-    int64 _eqB;
-    int64 _eqC;
+    int64 internal _eqA;
+    int64 internal _eqB;
+    int64 internal _eqC;
     
     mapping (address => uint256) private _level;
     
     error MintToOtherAccout();
     error RaiseLevelToOtherAccout();
     error RaiseLevelToZeroAddress();
+    error ReferToZeroAddress();
     error InvalidEquationConstants();
     error InsufficientTokenToRaiseNextLevel();
 
@@ -36,11 +37,9 @@ contract PTR is IPTR, ERC20, Ownable {
 
         //レベルアップ
         uint256 level_ = _level[account] + 1;
-        int256 ilevel = int256(level_);
-        int256 tokenRequire = _eqA * (ilevel ** 2) + _eqB * ilevel + _eqC;
-        if (tokenRequire <= 0) revert InvalidEquationConstants();
-        if (tokenRequire < int256(balanceOf(account))){
-            _burn(account, uint256(tokenRequire));
+        uint256 tokenRequire = requiredTokenToRaiseLevel(account);
+        if (tokenRequire < balanceOf(account)){
+            _burn(account, tokenRequire);
             _level[account] = level_;
             //イベント発行　表示するレベルは内部値+1
             emit RaiseLevel(account, level_ + 1);
@@ -49,28 +48,41 @@ contract PTR is IPTR, ERC20, Ownable {
         }
     }
 
+    function requiredTokenToRaiseLevel(address account) public view override returns(uint256){
+        //0x0は処理不可
+        if(account == address(0)) revert ReferToZeroAddress();
+        //レベルアップ
+        uint256 level_ = _level[account] + 1;
+        int256 ilevel = int256(level_);
+        int256 tokenRequire = int256(_eqA) * (ilevel ** 2) + int256(_eqB) * ilevel + int256(_eqC);
+        if (tokenRequire <= 0) revert InvalidEquationConstants();
+        return uint256(tokenRequire) * 1 ether;
+    }
+
     function level(address account) external view override returns(uint256){
         //表示するレベルは内部値+1
         return _level[account] + 1;
+       
 
-    }      
+    }
 
-    function eqA() public view override returns(int64){
+
+    function eqA() external view override returns(int64){
         return _eqA;
     }
-    function eqB() public view override returns(int64){
+    function eqB() external view override returns(int64){
         return _eqB;
     }
-    function eqC() public view override returns(int64){
+    function eqC() external view override returns(int64){
         return _eqC;
     }
-    function setEqA(int64 value) public override{
+    function setEqA(int64 value) external override onlyOwner(){
         _eqA = value;
     }
-    function setEqB(int64 value) public override{
+    function setEqB(int64 value) external override onlyOwner(){
         _eqB = value;
     }
-    function setEqC(int64 value) public override{
+    function setEqC(int64 value) external override onlyOwner(){
         _eqC = value;
     }
 
